@@ -2825,6 +2825,11 @@ adapters.forEach(function (adapters) {
             // mock a successful write for the first
             // document and a failed write for the second
             var doc = content.docs[0];
+
+            if (/^_local/.test(doc._id)) {
+              return bulkDocs.apply(remote, [content, opts, callback]);
+            }
+
             if (bulkDocsCallCount === 0) {
               bulkDocsCallCount++;
               callback(null, [{ok: true, id: doc._id, rev: doc._rev}]);
@@ -4083,6 +4088,140 @@ adapters.forEach(function (adapters) {
       }).on('complete', complete);
 
       remote.post({a: 'doc'});
+    });
+
+    it('#4293 Triggers extra replication events', function (done) {
+
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      var hasChange = false;
+      function change() {
+        hasChange = true;
+      }
+
+      var _complete = 0;
+      function complete() {
+        if (++_complete === 2) {
+          hasChange.should.equal(false);
+          done();
+        }
+      }
+
+      function paused() {
+        // Because every setTimeout should be justified :)
+        // We are testing a negative, that there are no extra events
+        // triggered from our replication, cancelling the replication will
+        // cancel the event anyway so we wait a short period and give it time
+        // to fire (since there is nothing to wait deteministically for)
+        // Without the setTimeout this will pass, just less likely to catch
+        // the failing case
+        setTimeout(function() {
+          push.cancel();
+          pull.cancel();
+        }, 100);
+      }
+
+      var push = remote.replicate.from(db, {live: true})
+        .on('paused', paused)
+        .on('complete', complete);
+
+      var pull = db.replicate.from(remote, {live: true})
+        .on('change', change)
+        .on('complete', complete);
+
+      db.post({a: 'doc'});
+    });
+
+    it('#4276 Triggers paused error', function (done) {
+
+      if (!(/http/.test(dbs.remote) && !/http/.test(dbs.name))) {
+        return done();
+      }
+
+      var err = {
+        "message": "_writer access is required for this request",
+        "name": "unauthorized",
+        "status": 401
+      };
+
+      var ajax = PouchDB.utils.ajax;
+      PouchDB.utils.ajax = function (opts, cb) {
+        cb(err);
+      };
+
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      db.bulkDocs([{foo: 'bar'}]).then(function() {
+
+        var repl = db.replicate.to(remote, {live: true, retry: true});
+
+        repl.on('paused', function(err) {
+          if (err) {
+            repl.cancel();
+          }
+        });
+        repl.on('complete', function(res) {
+          PouchDB.utils.ajax = ajax;
+          done();
+        });
+      });
+    });
+
+    it('Heartbeat gets passed', function (done) {
+
+      if (!(/http/.test(dbs.remote) && !/http/.test(dbs.name))) {
+        return done();
+      }
+
+      var seenHeartBeat = false;
+      var ajax = PouchDB.utils.ajax;
+      PouchDB.utils.ajax = function (opts, cb) {
+        if (/heartbeat/.test(opts.url)) {
+          seenHeartBeat = true;
+        }
+        ajax.apply(this, arguments);
+      };
+
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      return remote.bulkDocs([{foo: 'bar'}]).then(function() {
+        return db.replicate.from(remote, {heartbeat: 10});
+      }).then(function() {
+        seenHeartBeat.should.equal(true);
+        PouchDB.utils.ajax = ajax;
+        done();
+      });
+    });
+
+    it('Timeout gets passed', function (done) {
+
+      if (!(/http/.test(dbs.remote) && !/http/.test(dbs.name))) {
+        return done();
+      }
+
+      var seenTimeout = false;
+      var ajax = PouchDB.utils.ajax;
+      PouchDB.utils.ajax = function (opts, cb) {
+        // the http adapter takes 5s off the provided timeout
+        if (/timeout=15000/.test(opts.url)) {
+          seenTimeout = true;
+        }
+        ajax.apply(this, arguments);
+      };
+
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      return remote.bulkDocs([{foo: 'bar'}]).then(function() {
+        return db.replicate.from(remote, {timeout: 20000});
+      }).then(function() {
+        seenTimeout.should.equal(true);
+        PouchDB.utils.ajax = ajax;
+        done();
+      });
     });
 
   });

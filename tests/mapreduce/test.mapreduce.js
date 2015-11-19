@@ -361,7 +361,7 @@ function tests(suiteName, dbName, dbType, viewType) {
     });
 
     it("Test basic view collation", function () {
-      
+
       var values = [];
 
       // special values sort before all other types
@@ -799,7 +799,9 @@ function tests(suiteName, dbName, dbType, viewType) {
 
     it('#2858 Query works with attachments=true, binary=true 1', function () {
 
-      var db = new PouchDB(dbName);
+      // Need to avoid the cache to workaround
+      // https://issues.apache.org/jira/browse/COUCHDB-2880
+      var db = new PouchDB(dbName, {ajax: {cache: false}});
       var docs = [];
       for (var i = 0; i < 5; i++) {
         docs.push({
@@ -838,7 +840,9 @@ function tests(suiteName, dbName, dbType, viewType) {
 
     it('#2858 Query works with attachments=true, binary=true 2', function () {
 
-      var db = new PouchDB(dbName);
+      // Need to avoid the cache to workaround
+      // https://issues.apache.org/jira/browse/COUCHDB-2880
+      var db = new PouchDB(dbName, {ajax: {cache: false}});
       var docs = [];
       for (var i = 0; i < 5; i++) {
         docs.push({
@@ -2024,7 +2028,6 @@ function tests(suiteName, dbName, dbType, viewType) {
     });
 
     it('should query correctly with skip/limit and multiple keys/values', function () {
-      this.timeout(20000);
       var db = new PouchDB(dbName);
       var docs = {
         docs: [
@@ -3071,7 +3074,6 @@ function tests(suiteName, dbName, dbType, viewType) {
     });
 
     it('should update the emitted value', function () {
-      this.timeout(30000);
       return new PouchDB(dbName).then(function (db) {
         var docs = [];
         for (var i = 0; i < 300; i++) {

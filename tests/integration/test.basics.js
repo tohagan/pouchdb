@@ -31,11 +31,22 @@ adapters.forEach(function (adapter) {
       db.should.be.an.instanceof(PouchDB);
     });
 
-    it('Create a pouch with a promise', function (done) {
-      new PouchDB(dbs.name).then(function (db) {
-        db.should.be.an.instanceof(PouchDB);
-        done();
-      }, done);
+    it('Create a pouch with a promise', function () {
+      return new PouchDB(dbs.name);
+    });
+
+    it('4314 Create a pouch with + in name', function () {
+      var db = new PouchDB(dbs.name + '+suffix');
+      return db.info().then(function () {
+        return db.destroy();
+      });
+    });
+
+    it('4314 Create a pouch with urlencoded name', function () {
+      var db = new PouchDB(dbs.name + 'some%2Ftest');
+      return db.info().then(function () {
+        return db.destroy();
+      });
     });
 
     it('Catch an error when creating a pouch with a promise', function (done) {
@@ -77,6 +88,15 @@ adapters.forEach(function (adapter) {
       db.post({test: 'somestuff'}, function (err, info) {
         should.not.exist(err);
         done();
+      });
+    });
+
+    it('Get invalid id', function () {
+      var db = new PouchDB(dbs.name);
+      return db.get(1234).then(function() {
+        throw 'show not be here';
+      }).catch(function(err) {
+        should.exist(err);
       });
     });
 
@@ -559,8 +579,7 @@ adapters.forEach(function (adapter) {
         test: 'somestuff'
       }, function (err, info) {
         should.exist(err);
-        err.message.should.equal(PouchDB.Errors.INVALID_ID.message,
-                                 'correct error message returned');
+        err.error.should.equal(PouchDB.Errors.INVALID_ID.error);
         done();
       });
     });
@@ -1037,8 +1056,8 @@ adapters.forEach(function (adapter) {
         return db.get(doc._id);
       }).then(function (savedDoc) {
         // We shouldnt need to delete from doc here (#4273)
-        delete doc._rev;
-        delete doc._rev_tree;
+        should.not.exist(doc._rev);
+        should.not.exist(doc._rev_tree);
 
         delete savedDoc._rev;
         savedDoc.should.deep.equal(doc);

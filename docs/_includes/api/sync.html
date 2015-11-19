@@ -23,7 +23,9 @@ PouchDB.sync('mydb', 'http://localhost:5984/mydb');
 
 ### Options
 
-Please refer to [replicate()](api.html#replication) for documentation on options, as `sync()` is just a convenience method that entails bidirectional replication.
+* `options.push` + `options.pull`: Allows you to specify seperate [replication options](api.html#replication) for the individual replications.
+
+Replication options such as `filter` passed to sync directly will be passed to both replications. Please refer to [replicate()](api.html#replication) for documentation on those options.
 
 #### Example Usage:
 {% highlight js %}
@@ -51,6 +53,23 @@ There is also a shorthand for syncing given existing PouchDB objects. This behav
 
 {% highlight js %}
 db.sync(remoteDB, [options]);
+{% endhighlight %}
+
+#### Example Response:
+
+Change events in `sync` have an extra property `direction` which refers to the direction the change was going. Its value will either be `push` or `pull`.
+
+{% highlight js %}
+{ direction: 'push',
+  change:
+   { ok: true,
+     start_time: '2015-10-21T15:26:51.151Z',
+     docs_read: 1,
+     docs_written: 1,
+     doc_write_failures: 0,
+     errors: [],
+     last_seq: 1,
+     docs: [ [Object] ] } }
 {% endhighlight %}
 
 For any further details, please refer to [replicate()](api.html#replication).

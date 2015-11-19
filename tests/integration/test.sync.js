@@ -415,7 +415,7 @@ adapters.forEach(function (adapters) {
 
       replications.on('complete', function () {
         remote.put(doc2, function () {
-          changes.should.equal(2);
+          changes.should.equal(1);
           done();
         });
       });
@@ -423,7 +423,7 @@ adapters.forEach(function (adapters) {
       var changes = 0;
       replications.on('change', function (ch) {
         changes++;
-        if (changes === 2) {
+        if (changes === 1) {
           replications.pull.cancel();
         }
       });
@@ -719,5 +719,31 @@ adapters.forEach(function (adapters) {
       })
       .catch(done);
     });
+
+    it('4289 Seperate to / from filters', function () {
+
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      var localDocs = [{_id: '0'}, {_id: '1'}];
+      var remoteDocs = [{_id: 'a'}, {_id: 'b'}];
+
+      return remote.bulkDocs(remoteDocs).then(function() {
+        return db.bulkDocs(localDocs);
+      }).then(function() {
+        return db.sync(remote, {
+          push: {filter: function(doc) { return doc._id === '0'; }},
+          pull: {filter: function(doc) { return doc._id === 'a'; }}
+        });
+      }).then(function() {
+        return db.allDocs();
+      }).then(function(docs) {
+        docs.total_rows.should.equal(3);
+        return remote.allDocs();
+      }).then(function (docs) {
+        docs.total_rows.should.equal(3);
+      });
+    });
+
   });
 });

@@ -450,6 +450,24 @@ adapters.forEach(function (adapter) {
       });
     });
 
+    it('#4451 Changes with invalid view filter', function (done) {
+      var docs = [
+        {_id: '1', integer: 1},
+        {
+          _id: '_design/foo',
+          filters: { even: 'function (doc) { return doc.integer % 2 === 1; }' }
+        }
+      ];
+      var db = new PouchDB(dbs.name);
+      db.bulkDocs(docs).then(function() {
+        db.changes({filter: 'a/b/c'}).on('error', function (err) {
+          done('should not be called');
+        }).on('complete', function(res) {
+          done();
+        });
+      });
+    });
+
     it('3356 throw inside a filter', function (done) {
       var db = new PouchDB(dbs.name);
       db.put({
@@ -667,6 +685,10 @@ adapters.forEach(function (adapter) {
           changes.on('error', resolve);
           changes.on('change', reject);
         });
+      }).catch(function (err) {
+        // CouchDB Master has changed behaviour and now rejects invalid
+        // design documents
+        err.status.should.equal(400);
       });
     });
 
@@ -2310,6 +2332,34 @@ adapters.forEach(function (adapter) {
       db.post({key: 'value'});
     });
 
+    it('supports return_docs=false', function (done) {
+      var db = new PouchDB(dbs.name);
+      var docs = [];
+      var num = 10;
+      for (var i = 0; i < num; i++) {
+        docs.push({ _id: 'doc_' + i, });
+      }
+      var changes = 0;
+      db.bulkDocs({ docs: docs }, function (err, info) {
+        if (err) {
+          return done(err);
+        }
+        db.changes({
+          descending: true,
+          return_docs: false
+        }).on('change', function (change) {
+          changes++;
+        }).on('complete', function (results) {
+          results.results.should.have.length(0, '0 results returned');
+          changes.should.equal(num, 'correct number of changes');
+          done();
+        }).on('error', function (err) {
+          done(err);
+        });
+      });
+    });
+
+    // TODO: Remove 'returnDocs' in favor of 'return_docs' in a future release
     it('supports returnDocs=false', function (done) {
       var db = new PouchDB(dbs.name);
       var docs = [];
@@ -2324,7 +2374,7 @@ adapters.forEach(function (adapter) {
         }
         db.changes({
           descending: true,
-          returnDocs : false
+          returnDocs: false
         }).on('change', function (change) {
           changes++;
         }).on('complete', function (results) {

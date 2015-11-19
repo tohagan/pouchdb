@@ -13,8 +13,8 @@ describe('test.headers.js', function () {
   before(function (done) {
     server = http.createServer(function (req, res) {
       headers = req.headers;
-      res.writeHead(200, {'Content-Type': 'text/plain'});
-      res.end('');
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end('[]');
     });
     server.listen(PORT, done);
   });
@@ -78,6 +78,22 @@ describe('test.headers.js', function () {
     return db.get('fake', getOpts).then(function() {
       should.equal(headers.ick, 'slick');
       should.equal(headers.aheader, 'override!');
+    });
+  });
+
+  it('4450 Test headers are sent correctly on put', function() {
+    var opts = {auth: {username: 'foo', password: 'bar'}};
+    var db = new PouchDB('http://127.0.0.1:' + PORT, opts);
+    return db.put({
+      _id: 'doc',
+      _attachments: {
+        'att.txt': {
+          content_type: 'text/plain',
+          data: new Buffer(['Is there life on Mars?'], {type: 'text/plain'})
+        }
+      }
+    }).then(function() {
+      should.equal(headers.authorization, 'Basic Zm9vOmJhcg==');
     });
   });
 
